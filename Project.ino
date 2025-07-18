@@ -2,8 +2,8 @@
 
 Servo myServo;
 
-int triggerPin = 5;
-int echoPin = 4;
+int triggerPin = 6;
+int echoPin = 10;
 int timeInMicroSec, distance, centimeters;
 
 int redLED = 13;
@@ -13,33 +13,11 @@ int buzzer = 7;
 
 int relayPin = 3;
 
-int angle = 0;
-int step = 1;
-unsigned long lastUpdate = 0;
-const int interval = 15;
+int angle = -90;              // Start angle
+int step = 1;                 // +1 or -1 step
+unsigned long lastMove = 0;   // Time of last step
+const int interval = 15;      // Time between moves (ms)
 
-bool pauseServo = false;  // Controls whether servo moves
-
-// ------------------- FUNCTIONS -------------------
-
-void beepBeep(int x) {
-  digitalWrite(buzzer, HIGH);
-  delay(100);
-  digitalWrite(buzzer, LOW);
-  delay(100);
-  digitalWrite(buzzer, HIGH);
-  delay(100);
-  digitalWrite(buzzer, LOW);
-  delay(x);
-}
-
-void shoot() {
-  digitalWrite(relayPin, HIGH);
-  delay(500);  // Adjust if needed
-  digitalWrite(relayPin, LOW);
-}
-
-// -------------------- SETUP ---------------------
 
 void setup() {
   myServo.attach(9);
@@ -55,31 +33,23 @@ void setup() {
 
   Serial.begin(9600);
 
-  // Startup beep
-  digitalWrite(buzzer, HIGH);
-  delay(500);
-  digitalWrite(buzzer, LOW);
-  delay(500);
 }
 
-// -------------------- LOOP ---------------------
+// ------ FUNCTION ------
 
+// Relay
+void shoot(){
+  digitalWrite(relayPin, LOW);
+  delay(500);
+
+  digitalWrite(relayPin, HIGH);
+  delay(1000);
+}
+
+// ------ LOOP ------
 void loop() {
-  unsigned long currentTime = millis();
 
-  // Radar sweep logic (non-blocking)
-  if (!pauseServo && (currentTime - lastUpdate >= interval)) {
-    lastUpdate = currentTime;
-
-    myServo.write(angle);
-    angle += step;
-
-    if (angle >= 180 || angle <= 0) {
-      step = -step;
-    }
-  }
-
-  // --- Ultrasonic Distance Measurement ---
+// Ultrasonic Distance Measurement
   digitalWrite(triggerPin, LOW);
   delayMicroseconds(2);
   digitalWrite(triggerPin, HIGH);
@@ -90,30 +60,53 @@ void loop() {
   centimeters = timeInMicroSec / 29 / 2;
   distance = centimeters / 2.54; // convert to inches
 
-  Serial.print("\nDistance: ");
-  Serial.print(distance);
-
   // Reset LEDs
   digitalWrite(yellowLED, LOW);
   digitalWrite(redLED, LOW);
   digitalWrite(blueLED, LOW);
 
-  // --- Decision Making ---
+  // Distancing
   if (distance <= 12) {
-    pauseServo = true;  // Pause radar sweep
     digitalWrite(redLED, HIGH);
-    beepBeep(250);
+    digitalWrite(buzzer, HIGH);
     shoot();
-  } else {
-    pauseServo = false; // Resume sweep
 
-    if (distance <= 30) {
-      digitalWrite(yellowLED, HIGH);
-      beepBeep(700);
-    } else {
+  } 
+  else if (distance <= 20) {
+    digitalWrite(buzzer, LOW);
+    digitalWrite(yellowLED, HIGH);
+
+    } 
+    else {
       digitalWrite(blueLED, HIGH);
+      digitalWrite(buzzer, LOW);
+    }
+
+  delay(30);  // Small delay to avoid flooding serial
+
+  // Servo Logic
+// Servo sweep logic using millis()
+if (distance > 12) {
+  // true && 
+  unsigned long currentTime = millis();
+
+  if (currentTime - lastMove >= interval) {
+    lastMove = currentTime;
+
+    myServo.write(angle);  // Move servo
+    angle += step;
+
+    // Reverse direction at sweep limits
+    if (angle >= 90 || angle <= -90) {
+      step = -step;
     }
   }
-
-  delay(50);  // Small delay to avoid flooding serial
 }
+
+}
+
+
+
+
+
+
